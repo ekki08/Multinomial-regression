@@ -9,7 +9,7 @@ from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_sp
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score, 
-                           classification_report, confusion_matrix)
+                           classification_report, confusion_matrix, precision_recall_fscore_support)
 import mlflow
 import warnings
 warnings.filterwarnings('ignore')
@@ -229,16 +229,14 @@ plt.show()
 
 # Class-wise performance analysis
 print("=== CLASS-WISE PERFORMANCE ANALYSIS ===")
-for i, class_name in enumerate(['Low', 'Medium', 'High']):
-    class_precision = precision_score(y_test, y_pred_best, average=None, zero_division=0)[i]
-    class_recall = recall_score(y_test, y_pred_best, average=None, zero_division=0)[i]
-    class_f1 = f1_score(y_test, y_pred_best, average=None, zero_division=0)[i]
+precision_arr, recall_arr, f1_arr, support_arr = precision_recall_fscore_support(y_test, y_pred_best, labels=[0, 1, 2], zero_division=0)
     
+for i, class_name in enumerate(['Low', 'Medium', 'High']):    
     print(f"\n{class_name} Quality Wines:")
-    print(f"  Precision: {class_precision:.4f}")
-    print(f"  Recall: {class_recall:.4f}")
-    print(f"  F1-Score: {class_f1:.4f}")
-    print(f"  Support: {np.sum(y_test == i)} samples")
+    print(f"  Precision: {precision_arr[i]:.4f}")
+    print(f"  Recall: {recall_arr[i]:.4f}")
+    print(f"  F1-Score: {f1_arr[i]:.4f}")
+    print(f"  Support: {support_arr[i]} samples")
 
 # Prediction probabilities analysis
 y_pred_proba_best = best_model.predict_proba(X_test)
@@ -326,51 +324,57 @@ with mlflow.start_run(run_name="Enhanced_Multinomial_Regression"):
     
     # Register model to MLflow Model Registry
     model_name = "WineQuality_Multinomial_Regression"
-    model_version = mlflow.register_model(
-        model_uri=f"runs:/{mlflow.active_run().info.run_id}/enhanced_multinomial_regression_model",
-        name=model_name
-    )
-    
-    print(f"Model registered to MLflow Model Registry!")
-    print(f"Model name: {model_name}")
-    print(f"Model version: {model_version.version}")
-    
-    # Add model description and tags
-    from mlflow.tracking import MlflowClient
-    client = MlflowClient()
-    
-    # Update model version with description and tags
-    client.update_model_version(
-        name=model_name,
-        version=model_version.version,
-        description=f"Enhanced Multinomial Logistic Regression for Wine Quality Classification. "
-                   f"Accuracy: {accuracy_best:.4f}, F1-weighted: {f1_best:.4f}. "
-                   f"Uses StandardScaler preprocessing and GridSearchCV hyperparameter tuning."
-    )
-    
-    # Set tags for the model version
-    client.set_model_version_tag(
-        name=model_name,
-        version=model_version.version,
-        key="model_type",
-        value="multinomial_logistic_regression"
-    )
-    
-    client.set_model_version_tag(
-        name=model_name,
-        version=model_version.version,
-        key="preprocessing",
-        value="StandardScaler"
-    )
-    
-    client.set_model_version_tag(
-        name=model_name,
-        version=model_version.version,
-        key="hyperparameter_tuning",
-        value="GridSearchCV"
-    )
-    
-    print("Model version updated with description and tags!")
+    try:
+        model_version = mlflow.register_model(
+            model_uri=f"runs:/{mlflow.active_run().info.run_id}/enhanced_multinomial_regression_model",
+            name=model_name
+        )
+
+        print(f"Model registered to MLflow Model Registry!")
+        print(f"Model name: {model_name}")
+        print(f"Model version: {model_version.version}")
+
+        # Add model description and tags
+        from mlflow.tracking import MlflowClient
+        client = MlflowClient()
+
+        # Update model version with description and tags
+        client.update_model_version(
+            name=model_name,
+            version=model_version.version,
+            description=(
+                f"Enhanced Multinomial Logistic Regression for Wine Quality Classification. "
+                f"Accuracy: {accuracy_best:.4f}, F1-weighted: {f1_best:.4f}. "
+                f"Uses StandardScaler preprocessing and GridSearchCV hyperparameter tuning."
+            )
+        )
+
+        # Set tags for the model version
+        client.set_model_version_tag(
+            name=model_name,
+            version=model_version.version,
+            key="model_type",
+            value="multinomial_logistic_regression"
+        )
+
+        client.set_model_version_tag(
+            name=model_name,
+            version=model_version.version,
+            key="preprocessing",
+            value="StandardScaler"
+        )
+
+        client.set_model_version_tag(
+            name=model_name,
+            version=model_version.version,
+            key="hyperparameter_tuning",
+            value="GridSearchCV"
+        )
+
+        print("Model version updated with description and tags!")
+    except Exception as e:
+        # Catch registry/network/permission errors and continue — log for debugging
+        print(f"Warning: could not register/update model in MLflow Model Registry: {e}")
 
 # ============================================== COMPARISON WITH ORIGINAL MODEL ==============================================
 
